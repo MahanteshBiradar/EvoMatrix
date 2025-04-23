@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, ReactNode } from 'react';
+import bcrypt from 'bcryptjs';
 
 export interface User {
   id: string;
@@ -63,21 +64,35 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   const login = async (email: string, password: string): Promise<boolean> => {
     try {
       setIsLoading(true);
+
+      const storedUserString = localStorage.getItem('user');
+      const storedHashedPassword = localStorage.getItem('hashedPassword');
+
+      if (!storedUserString || !storedHashedPassword) {
+        console.warn('User not found');
+        return false;
+      }
+
+      const storedUser = JSON.parse(storedUserString);
       
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Mock user data (would come from API in real app)
+      if (storedUser.email !== email) {
+        console.warn('Email does not match');
+        return false;
+      }
+  
+      const isMatch = await bcrypt.compare(password, storedHashedPassword);
+  
+      if (!isMatch) {
+        console.warn('Incorrect password');
+        return false;
+      }
+
       const mockUser: User = {
-        id: '1',
-        username: email.split('@')[0],
-        email,
-        joinDate: new Date(),
-        balance: 0,
+        ...storedUser,
+        joinDate: new Date(storedUser.joinDate),
       };
-      
+
       setUser(mockUser);
-      localStorage.setItem('user', JSON.stringify(mockUser));
       return true;
     } catch (error) {
       console.error('Login failed', error);
@@ -96,11 +111,11 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     try {
       setIsLoading(true);
       
-      // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Hash the password
+      const hashedPassword = await bcrypt.hash(password, 10);
       
       const mockUser: User = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: Math.random().toString(36).slice(2, 11),
         username,
         email,
         joinDate: new Date(),
@@ -108,6 +123,8 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         balance: 0,
       };
       
+      // Save hashedPassword separately (normally sent to backend)
+      localStorage.setItem('hashedPassword', hashedPassword);
       setUser(mockUser);
       localStorage.setItem('user', JSON.stringify(mockUser));
       return true;
